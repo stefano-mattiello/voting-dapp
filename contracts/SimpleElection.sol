@@ -6,7 +6,7 @@ contract SimpleElection {
     struct Election {
         bytes32 name;
         string description;
-        uint256 id;
+        uint32 id;
         bool requireRegitration;
         uint32 startElection;
         uint32 endElection;
@@ -14,7 +14,8 @@ contract SimpleElection {
         uint32 endRegistration;
     }
 
-    bytes32[] currentElections; //list of current elections
+    mapping(bytes32 => uint32) electionsNames; //list of current elections
+    uint32[] currentElections;
 
     //Structure of candidate standing in an election
     struct Candidate {
@@ -30,22 +31,23 @@ contract SimpleElection {
     }
 
     //Mapping of the elections
-    mapping(bytes32 => Election) elections;
+    mapping(uint32 => Election) elections;
 
     //Mappings of the proposals for every election
-    mapping(bytes32 => mapping(bytes32 => Candidate)) public candidates;
+    mapping(uint32 => mapping(bytes32 => Candidate)) public candidates;
 
     //List of the proposal for every election
-    mapping(bytes32 => bytes32[]) public candidatesList;
+    mapping(uint32 => bytes32[]) public candidatesList;
 
     //Number of proposal for every election
-    mapping(bytes32 => uint256) public candidatesCount;
+    mapping(uint32 => uint256) public candidatesCount;
 
     //Mapping of the voters for every election
-    mapping(bytes32 => mapping(address => Voter)) public voters;
+    mapping(uint32 => mapping(address => Voter)) public voters;
 
     //A nonce to assign the id to the elections
-    uint256 electionNonce = 1;
+    uint32 electionNonce = 1;
+    uint32 electionCount = 1;
 
     event ElectionCreated(
         bytes32 name,
@@ -71,30 +73,32 @@ contract SimpleElection {
         uint32 _endRegistration //date of the end of the registration period
     ) public {
         require(_candidates.length > 0, "There should be atleast 1 candidate.");
+        uint32 electionId = electionNonce;
         require(
-            elections[_name].id == 0,
+            elections[electionId].id == 0,
             "This election already exists, please select other name"
         );
 
-        elections[_name] = Election(
+        elections[electionId] = Election(
             _name,
             _description,
-            electionNonce,
+            electionId,
             _requireRegitration,
             _startElection,
             _endElection,
             _startRegistration,
             _endRegistration
         );
-        currentElections.push(_name);
+        electionsNames[_name] = electionId;
+        currentElections.push(electionId);
 
         for (uint256 i = 0; i < _candidates.length; i++) {
-            addCandidate(_name, _candidates[i]);
+            addCandidate(electionId, _candidates[i]);
         }
         emit ElectionCreated(
             _name,
             _description,
-            electionNonce,
+            electionId,
             _requireRegitration,
             _startElection,
             _endElection,
@@ -102,71 +106,67 @@ contract SimpleElection {
             _endRegistration
         );
         electionNonce++;
+        electionCount++;
     }
 
     //Private function to add a candidate
-    function addCandidate(bytes32 _electioName, bytes32 _candidateName)
-        private
-    {
-        candidates[_electioName][_candidateName] = Candidate(
+    function addCandidate(uint32 _electionId, bytes32 _candidateName) private {
+        candidates[_electionId][_candidateName] = Candidate(
             _candidateName,
             0,
             true
         );
-        candidatesList[_electioName].push(_candidateName);
-        candidatesCount[_electioName]++;
+        candidatesList[_electionId].push(_candidateName);
+        candidatesCount[_electionId]++;
     }
 
     //Public vote function for voting a candidate
     function vote(
-        bytes32 _electionName, //the election in which vote
+        uint32 _electionId, //the election in which vote
         bytes32 _candidate, //the proposal to vote
         uint256 _weight //"how many times" vote
     ) public {
-        require(elections[_electionName].id != 0, "The election doesn't exist");
+        require(elections[_electionId].id != 0, "The election doesn't exist");
         require(
-            elections[_electionName].startElection <= block.timestamp,
+            elections[_electionId].startElection <= block.timestamp,
             "The election has not started yet"
         );
         require(
-            elections[_electionName].endElection >= block.timestamp,
+            elections[_electionId].endElection >= block.timestamp,
             "Election already ended"
         );
         address voter = msg.sender;
-        if (elections[_electionName].requireRegitration) {
+        if (elections[_electionId].requireRegitration) {
             require(
-                voters[_electionName][voter].weight != 0,
+                voters[_electionId][voter].weight != 0,
                 "Voter hasn't registered"
             );
         } else {
-            voters[_electionName][voter].weight = 1;
+            voters[_electionId][voter].weight = 1;
         }
         require(
-            _weight <= voters[_electionName][voter].weight,
+            _weight <= voters[_electionId][voter].weight,
             "Voter do not have so many votes"
         );
+        require(!voters[_electionId][voter].voted, "Voter has already Voted!");
         require(
-            !voters[_electionName][voter].voted,
-            "Voter has already Voted!"
-        );
-        require(
-            candidates[_electionName][_candidate].votable,
+            candidates[_electionId][_candidate].votable,
             "Invalid candidate to Vote!"
         );
 
         //update the vote count of the voted proposal
-        candidates[_electionName][_candidate].voteCount =
-            candidates[_electionName][_candidate].voteCount +
+        candidates[_electionId][_candidate].voteCount =
+            candidates[_electionId][_candidate].voteCount +
             _weight;
 
         //subtract the votes to the voter Structure
-        voters[_electionName][voter].weight =
-            voters[_electionName][voter].weight -
+        voters[_electionId][voter].weight =
+            voters[_electionId][voter].weight -
             _weight;
 
         //set the variable voted to true if the voter does not have other votes
-        if (voters[_electionName][voter].weight == 0) {
-            voters[_electionName][voter].voted = true;
+        if (voters[_electionId][voter].weight == 0) {
+            voters[_electionId][voter].voted = true;
         }
 
         emit Voted(voter, _candidate, _weight);
@@ -174,28 +174,32 @@ contract SimpleElection {
 
     //get list of elections
     function getCurrentElections() public view returns (bytes32[] memory) {
-        return currentElections;
+        bytes32[] memory result = new bytes32[](currentElections.length);
+        for (uint32 i = 0; i < currentElections.length; i++) {
+            result[i] = elections[currentElections[i]].name;
+        }
+        return result;
     }
 
     //get list of proposal of an election
-    function getCandidatesForElection(bytes32 _electionName)
+    function getCandidatesForElection(uint32 _electionId)
         public
         view
         returns (bytes32[] memory)
     {
-        return candidatesList[_electionName];
+        return candidatesList[_electionId];
     }
 
     //register for an election
-    function register(bytes32 _electionName) public {
+    function register(uint32 _electionId) public {
         require(
-            elections[_electionName].startRegistration <= block.timestamp,
+            elections[_electionId].startRegistration <= block.timestamp,
             "Registration not open"
         );
         require(
-            elections[_electionName].endRegistration >= block.timestamp,
+            elections[_electionId].endRegistration >= block.timestamp,
             "Registration closed"
         );
-        voters[_electionName][msg.sender].weight = 1;
+        voters[_electionId][msg.sender].weight = 1;
     }
 }
