@@ -14,10 +14,15 @@ def get_account(index=None,id=None):
         return accounts[0]
     return accounts.add(config["wallets"]["from_key"])
 
-
+def to_bytes(obj):
+    if type(obj)==str:
+        return obj.encode('utf-8')
+    elif type(obj)==list:
+        return [to_bytes(x) for x in obj]
   
 
-
+def from_bytes(string):
+    return string.decode('utf-8')
 
 DECIMALS=8
 INITIAL_VALUE=200000000000
