@@ -6,7 +6,7 @@ contract SimpleElection {
     struct Election {
         bytes32 name;
         string description;
-        bool requireRegitration;
+        bool requireRegistration;
         uint32 id;
         uint32 startElection;
         uint32 endElection;
@@ -51,7 +51,7 @@ contract SimpleElection {
         bytes32 name,
         string description,
         uint256 electionId,
-        bool requireRegitration,
+        bool requireRegistration,
         uint32 startElection,
         uint32 endElection,
         uint32 startRegistration,
@@ -74,7 +74,7 @@ contract SimpleElection {
     function createElection(
         bytes32 _name, //name of the election
         string memory _description, //a description
-        bool _requireRegitration, //true if is required a registration
+        bool _requireRegistration, //true if is required a registration
         bytes32[] memory _candidates, //the list of proposals
         uint32 _startElection, //date of the begin of the election period
         uint32 _endElection, //date of the end of the election period
@@ -90,7 +90,7 @@ contract SimpleElection {
         elections[electionId] = Election(
             _name,
             _description,
-            _requireRegitration,
+            _requireRegistration,
             electionId,
             _startElection,
             _endElection,
@@ -107,7 +107,7 @@ contract SimpleElection {
             _name,
             _description,
             electionId,
-            _requireRegitration,
+            _requireRegistration,
             _startElection,
             _endElection,
             _startRegistration,
@@ -137,7 +137,7 @@ contract SimpleElection {
     ) private {
         require(electionExists(_electionId), "The election doesn't exist");
         require(checkElectionOpen(_electionId), "The election is closed");
-        if (elections[_electionId].requireRegitration) {
+        if (elections[_electionId].requireRegistration) {
             require(
                 voterHasRegistred(_electionId, _voter),
                 "Voter hasn't registered"
